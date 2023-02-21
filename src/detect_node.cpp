@@ -129,8 +129,8 @@ int main(int argc, char** argv)
 
     //ROS_INFO("cols : %d , rows : %d" , frame.cols, frame.rows);
 
-    sensor_msgs::ImagePtr pub_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", copyImg).toImageMsg();
-    sensor_msgs::ImagePtr pub_msg2 = cv_bridge::CvImage(std_msgs::Header(), "bgr8", frame).toImageMsg();
+    sensor_msgs::ImagePtr pub_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", frame).toImageMsg();
+    sensor_msgs::ImagePtr pub_msg2 = cv_bridge::CvImage(std_msgs::Header(), "bgr8", copyImg).toImageMsg();
     pub.publish(pub_msg);
     pub2.publish(pub_msg2);
 
