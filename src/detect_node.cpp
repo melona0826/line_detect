@@ -9,17 +9,20 @@
 using namespace std;
 using namespace cv;
 
-int roi_x = 1760;
-int roi_y = 0;
-int roi_width = 2500;
-int roi_height = 700;
+int frame_wid = 640;
+int frame_hei = 480;
 
-int yellow_hue_low = 10;
-int yellow_hue_high = 30;
-int yellow_sat_low = 60;
-int yellow_sat_high = 255;
-int yellow_val_low = 50;
-int yellow_val_high =200;
+int roi_x = 80;
+int roi_y = 240;
+int roi_width = frame_wid - roi_x;
+int roi_height = frame_hei - roi_y;
+
+int black_hue_low = 0;
+int black_hue_high = 255;
+int black_sat_low = 0;
+int black_sat_high = 255;
+int black_val_low = 0;
+int black_val_high =111;
 
 int main(int argc, char** argv)
 {
@@ -28,8 +31,8 @@ int main(int argc, char** argv)
 
   image_transport::ImageTransport it(nh);
   image_transport::Publisher pub = it.advertise("/line_detect/detect_img", 1);
-  image_transport::Publisher pub2 = it.advertise("/line_detect/yellow_img", 1);
-  image_transport::Subscriber sub = it.subscribe("/mindvision1/image", 1,
+  image_transport::Publisher pub2 = it.advertise("/line_detect/black_img", 1);
+  image_transport::Subscriber sub = it.subscribe("/cam/raw_img", 1,
   [&](const sensor_msgs::ImageConstPtr& msg){
     cv_bridge::CvImageConstPtr cv_ptr;
     try
@@ -50,19 +53,22 @@ int main(int argc, char** argv)
     Rect roi(roi_x, roi_y, roi_width, roi_height);
     frame = frame(bounds & roi);
 
-    Mat img_hsv, yellow_mask, img_yellow, img_edge;
+    cout << "row : " << frame.rows << endl;
+    cout << "cols : " << frame.cols << endl;
+
+    Mat img_hsv, black_mask, img_black, img_edge;
     cvtColor(frame, img_hsv, COLOR_BGR2HSV);
 
-    //inRange(img_hsv, Scalar(10, 71, 76) , Scalar(30, 255, 255), yellow_mask);
-    inRange(img_hsv, Scalar(yellow_hue_low, yellow_sat_low, yellow_val_low) , Scalar(yellow_hue_high, yellow_sat_high, yellow_val_high), yellow_mask);
+    //inRange(img_hsv, Scalar(10, 71, 76) , Scalar(30, 255, 255), black_mask);
+    inRange(img_hsv, Scalar(black_hue_low, black_sat_low, black_val_low) , Scalar(black_hue_high, black_sat_high, black_val_high), black_mask);
 
-    bitwise_and(frame, frame, img_yellow, yellow_mask);
+    bitwise_and(frame, frame, img_black, black_mask);
 
     Mat copyImg;
-    img_yellow.copyTo(copyImg);
+    img_black.copyTo(copyImg);
 
-    cvtColor(img_yellow, img_yellow, COLOR_BGR2GRAY);
-    Canny(img_yellow, img_edge, 50, 450);
+    cvtColor(img_black, img_black, COLOR_BGR2GRAY);
+    Canny(img_black, img_edge, 50, 450);
 
     vector<Vec4i> lines;
     HoughLinesP(img_edge, lines, 1, CV_PI / 180 , 50 ,20, 10);
@@ -76,7 +82,7 @@ int main(int argc, char** argv)
     int slope_tor = 45;
     double slope_treshol = (90 - slope_tor) * CV_PI / 180.0;
 
-    cout << "slope treshol : " << slope_treshol << endl;
+
 
     for(size_t i = 0; i < lines.size(); i++)
     {
@@ -85,7 +91,7 @@ int main(int argc, char** argv)
       pt2 = Point(line[2], line[3]);
 
       double slope = (static_cast<double>(pt1.y) - static_cast<double>(pt2.y)) / (static_cast<double>(pt1.x) - static_cast<double>(pt2.x) );
-      cout << slope << endl;
+      //cout << slope << endl;
 
       cv::line(frame, Point(pt1.x, pt1.y) , Point(pt2.x , pt2.y) , Scalar(0,255,0) , 2 , 8);
       if(abs(slope) >= slope_treshol)
@@ -109,7 +115,7 @@ int main(int argc, char** argv)
       double pt1_x = ((pt1_y - b.y) / m) + b.x;
       double pt2_x = ((pt2_y - b.y) / m) + b.x;
 
-      cout << "slope : " << (static_cast<double>(pt1_y) - static_cast<double>(pt2_y)) / (static_cast<double>(pt1_x) - static_cast<double>(pt2_x)) << endl;
+      //cout << "slope : " << (static_cast<double>(pt1_y) - static_cast<double>(pt2_y)) / (static_cast<double>(pt1_x) - static_cast<double>(pt2_x)) << endl;
 
       line(frame, Point(pt1_x, pt1_y) , Point(pt2_x , pt2_y) , Scalar(0,0,255) , 2 , 8);
     }
@@ -118,7 +124,7 @@ int main(int argc, char** argv)
 
    for(size_t i = 0; i < selected_lines.size(); i++)
     {
-      cout << "i : " << i << endl;
+      //cout << "i : " << i << endl;
       Vec4i I = selected_lines[i];
       line(frame, Point(I[0], I[1]), Point(I[2], I[3]) , Scalar(255,0,0) , 2 , 8);
     }
