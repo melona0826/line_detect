@@ -34,5 +34,8 @@ include_directories(
   ${OpenCV_INCLUDE_DIRS}
 )
 
-add_executable(detect_node src/detect_node.cpp)
-target_link_libraries(detect_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+add_executable(yellow_detect_node src/detect_yellow_node.cpp)
+target_link_libraries(yellow_detect_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+
+add_executable(white_detect_node src/detect_white_node.cpp)
+target_link_libraries(white_detect_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})

@@ -9,17 +9,20 @@
 using namespace std;
 using namespace cv;
 
-int roi_x = 1760;
-int roi_y = 0;
-int roi_width = 2500;
-int roi_height = 700;
+//White ROI
+int roi_x = 2200;
+int roi_y = 350;
+int roi_width = 1600;
+int roi_height = 350;
 
-int yellow_hue_low = 10;
-int yellow_hue_high = 30;
-int yellow_sat_low = 60;
-int yellow_sat_high = 255;
-int yellow_val_low = 50;
-int yellow_val_high =200;
+//White Color Setting
+int white_hue_low = 0;
+int white_hue_high = 255;
+int white_sat_low = 0;
+int white_sat_high = 12;
+int white_val_low = 93;
+int white_val_high =255;
+
 
 int main(int argc, char** argv)
 {
@@ -27,8 +30,8 @@ int main(int argc, char** argv)
   ros::NodeHandle nh;
 
   image_transport::ImageTransport it(nh);
-  image_transport::Publisher pub = it.advertise("/line_detect/detect_img", 1);
-  image_transport::Publisher pub2 = it.advertise("/line_detect/yellow_img", 1);
+  image_transport::Publisher pub = it.advertise("/line_detect/white_detect_img", 1);
+  image_transport::Publisher pub2 = it.advertise("/line_detect/white_img", 1);
   image_transport::Subscriber sub = it.subscribe("/mindvision1/image", 1,
   [&](const sensor_msgs::ImageConstPtr& msg){
     cv_bridge::CvImageConstPtr cv_ptr;
@@ -45,28 +48,25 @@ int main(int argc, char** argv)
     Mat frame = cv_ptr->image;
     Mat grayImg, blurImg, edgeImg;
 
-
     Rect bounds(0, 0, frame.cols, frame.rows);
     Rect roi(roi_x, roi_y, roi_width, roi_height);
     frame = frame(bounds & roi);
 
-    Mat img_hsv, yellow_mask, img_yellow, img_edge;
+    Mat img_hsv, white_mask, img_white, img_edge;
     cvtColor(frame, img_hsv, COLOR_BGR2HSV);
 
-    //inRange(img_hsv, Scalar(10, 71, 76) , Scalar(30, 255, 255), yellow_mask);
-    inRange(img_hsv, Scalar(yellow_hue_low, yellow_sat_low, yellow_val_low) , Scalar(yellow_hue_high, yellow_sat_high, yellow_val_high), yellow_mask);
-
-    bitwise_and(frame, frame, img_yellow, yellow_mask);
+    //inRange(img_hsv, Scalar(10, 71, 76) , Scalar(30, 255, 255), white_mask);
+    inRange(img_hsv, Scalar(white_hue_low, white_sat_low, white_val_low) , Scalar(white_hue_high, white_sat_high, white_val_high), white_mask);
+    bitwise_and(frame, frame, img_white, white_mask);
 
     Mat copyImg;
-    img_yellow.copyTo(copyImg);
+    img_white.copyTo(copyImg);
 
-    cvtColor(img_yellow, img_yellow, COLOR_BGR2GRAY);
-    Canny(img_yellow, img_edge, 50, 450);
+    cvtColor(img_white, img_white, COLOR_BGR2GRAY);
+    Canny(img_white, img_edge, 80, 550);
 
     vector<Vec4i> lines;
     HoughLinesP(img_edge, lines, 1, CV_PI / 180 , 50 ,20, 10);
-
 
     Point pt1, pt2;
     vector<double> slopes;
@@ -124,11 +124,7 @@ int main(int argc, char** argv)
     }
 
 
-
-
-
     //ROS_INFO("cols : %d , rows : %d" , frame.cols, frame.rows);
-
     sensor_msgs::ImagePtr pub_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", frame).toImageMsg();
     sensor_msgs::ImagePtr pub_msg2 = cv_bridge::CvImage(std_msgs::Header(), "bgr8", copyImg).toImageMsg();
     pub.publish(pub_msg);
