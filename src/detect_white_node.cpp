@@ -14,15 +14,15 @@ using namespace cv;
 int roi_x = 2200;
 int roi_y = 350;
 int roi_width = 1600;
-int roi_height = 350;
+int roi_height = 280;
 
 //White Color Setting
-int white_hue_low = 0;
-int white_hue_high = 255;
-int white_sat_low = 0;
-int white_sat_high = 12;
-int white_val_low = 93;
-int white_val_high =255;
+int white_b_low = 110;
+int white_b_high = 150;
+int white_g_low = 110;
+int white_g_high = 150;
+int white_r_low = 110;
+int white_r_high =150;
 
 int main(int argc, char** argv)
 {
@@ -63,7 +63,7 @@ int main(int argc, char** argv)
     // Recognize Slope angle treshold (-45 deg ~ 45deg)
     double slope_treshold = (90 - slope_tor) * CV_PI / 180.0;
 
-    Mat img_hsv, white_mask, img_white, img_edge;
+    Mat img_hsv, white_mask, img_white, img_edge, test;
     Mat frame = cv_ptr->image;
     Mat grayImg, blurImg, edgeImg, copyImg;
 
@@ -79,14 +79,13 @@ int main(int argc, char** argv)
 
     // Color Filtering
 
-    cvtColor(frame, img_hsv, COLOR_BGR2HSV);
-    inRange(img_hsv, Scalar(white_hue_low, white_sat_low, white_val_low) , Scalar(white_hue_high, white_sat_high, white_val_high), white_mask);
+    inRange(frame, Scalar(white_b_low, white_g_low, white_r_low) , Scalar(white_b_high, white_g_high, white_r_high), white_mask);
     bitwise_and(frame, frame, img_white, white_mask);
     img_white.copyTo(copyImg);
 
     // Canny Edge Detection
     cvtColor(img_white, img_white, COLOR_BGR2GRAY);
-    Canny(img_white, img_edge, 50, 450);
+    Canny(img_white, img_edge, 20, 500);
 
     // Line Dtection
     HoughLinesP(img_edge, lines, 1, CV_PI / 180 , 50 ,20, 10);
