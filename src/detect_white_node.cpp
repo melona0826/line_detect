@@ -13,15 +13,15 @@ using namespace cv;
 //White ROI
 int roi_x = 2200;
 int roi_y = 350;
-int roi_width = 1600;
+int roi_width = 1200;
 int roi_height = 280;
 
 //White Color Setting
-int white_b_low = 110;
+int white_b_low = 95;
 int white_b_high = 150;
-int white_g_low = 110;
+int white_g_low = 95;
 int white_g_high = 150;
-int white_r_low = 110;
+int white_r_low = 95;
 int white_r_high =150;
 
 int main(int argc, char** argv)
@@ -59,7 +59,7 @@ int main(int argc, char** argv)
     }
 
     // Recognize Slope angle tolerance
-    int slope_tor = 45;
+    int slope_tor = 60;
     // Recognize Slope angle treshold (-45 deg ~ 45deg)
     double slope_treshold = (90 - slope_tor) * CV_PI / 180.0;
 
@@ -67,11 +67,13 @@ int main(int argc, char** argv)
     Mat frame = cv_ptr->image;
     Mat grayImg, blurImg, edgeImg, copyImg;
 
+    int x_left_lim = frame.cols, x_right_lim = 0, x_lim;
+
     Point pt1, pt2;
-    vector<Vec4i> lines, selected_lines;
+    vector<Vec4i> lines, selected_lines, right_lines, left_lines;
     vector<double> slopes;
-    vector<Point> pts;
-    Vec4d fit_line;
+    vector<Point> left_pts, right_pts;
+    Vec4d left_fit_line, right_fit_line, fit_line;
 
     Rect bounds(0, 0, frame.cols, frame.rows);
     Rect roi(roi_x, roi_y, roi_width, roi_height);
@@ -85,7 +87,7 @@ int main(int argc, char** argv)
 
     // Canny Edge Detection
     cvtColor(img_white, img_white, COLOR_BGR2GRAY);
-    Canny(img_white, img_edge, 20, 500);
+    Canny(img_white, img_edge, 50, 150);
 
     // Line Dtection
     HoughLinesP(img_edge, lines, 1, CV_PI / 180 , 50 ,20, 10);
@@ -105,40 +107,90 @@ int main(int argc, char** argv)
       if(abs(slope) >= slope_treshold)
       {
         selected_lines.push_back(line);
-        pts.push_back(pt1);
-        pts.push_back(pt2);
+        if(pt1.x < x_left_lim )
+          x_left_lim = pt1.x;
+
+        else if(pt1.x > x_right_lim)
+          x_right_lim = pt1.x;
+
+        if(pt2.x < x_left_lim)
+          x_left_lim = pt2.x;
+
+        else if(pt2.x > x_right_lim)
+          x_right_lim = pt2.x;
       }
     }
 
-    if(pts.size() > 0)
+    if(selected_lines.size() > 0)
     {
-      fitLine(pts, fit_line, DIST_L2, 0, 0.01, 0.01);
+      x_lim = (x_left_lim + x_right_lim) / 2;
+      for(size_t i = 0; i < selected_lines.size(); i++)
+      {
+        pt1 = Point(selected_lines[i][0] , selected_lines[i][1]);
+        pt2 = Point(selected_lines[i][2], selected_lines[i][3]);
 
-      double m = fit_line[1] / fit_line[0];
-      Point b = Point(fit_line[2], fit_line[3]);
+        if(pt1.x <= x_lim && pt2.x <= x_lim)
+        {
+          left_lines.push_back(selected_lines[i]);
+          left_pts.push_back(pt1);
+          left_pts.push_back(pt2);
+        }
 
-      int pt1_y = frame.rows;
-      int pt2_y = 0;
 
-      double pt1_x = ((pt1_y - b.y) / m) + b.x;
-      double pt2_x = ((pt2_y - b.y) / m) + b.x;
+        else if(pt1.x > x_lim && pt2.x > x_lim)
+        {
+          right_lines.push_back(selected_lines[i]);
+          right_pts.push_back(pt1);
+          right_pts.push_back(pt2);
+        }
 
-      //cout << "slope : " << (static_cast<double>(pt1_y) - static_cast<double>(pt2_y)) / (static_cast<double>(pt1_x) - static_cast<double>(pt2_x)) << endl;
+      }
 
-      line(frame, Point(pt1_x, pt1_y) , Point(pt2_x , pt2_y) , Scalar(0,0,255) , 2 , 8);
+      if(left_pts.size() > 0 && right_pts.size() > 0)
+      {
+        fitLine(right_pts, right_fit_line, DIST_L2, 0,0.1, 0.01);
+        fitLine(left_pts, left_fit_line, DIST_L2, 0, 0.01, 0.01);
 
-      fitLine_msg.x = b.x;
-      fitLine_msg.y = b.y;
-      fitLine_msg.theta = m;
+        double r_m = right_fit_line[1] / right_fit_line[0];
+        Point r_b = Point(right_fit_line[2], right_fit_line[3]);
+
+        double l_m = left_fit_line[1] / left_fit_line[0];
+        Point l_b = Point(left_fit_line[2], left_fit_line[3]);
+
+        double vm = (r_m + l_m)/2;
+        double vx = static_cast<double>(((r_m * r_b.x) - (l_m * l_b.x) - r_b.y + l_b.y) / (r_m - l_m));
+        double vy = (vm * vx) + l_m;
+
+
+        ROS_INFO("vx :%f" , vx);
+
+        int pt1_y = frame.rows;
+        int pt2_y = 0;
+
+        double pt1_x = ((pt1_y - l_b.y) / l_m) + l_b.x;
+        double pt2_x = ((pt2_y - l_b.y) / l_m) + l_b.x;
+
+
+        //cout << "slope : " << (static_cast<double>(pt1_y) - static_cast<double>(pt2_y)) / (static_cast<double>(pt1_x) - static_cast<double>(pt2_x)) << endl;
+
+        line(frame, Point(pt1_x, pt1_y) , Point(pt2_x , pt2_y) , Scalar(0,0,255) , 2 , 8);
+
+        fitLine_msg.x = l_b.x;
+        fitLine_msg.y = l_b.y;
+        fitLine_msg.theta = l_m;
+
+
+
+      for(size_t i = 0; i < selected_lines.size(); i++)
+        {
+          //cout << "i : " << i << endl;
+          Vec4i I = selected_lines[i];
+          line(frame, Point(I[0], I[1]), Point(I[2], I[3]) , Scalar(255,0,0) , 2 , 8);
+        }
+      }
+
     }
 
-
-   for(size_t i = 0; i < selected_lines.size(); i++)
-    {
-      //cout << "i : " << i << endl;
-      Vec4i I = selected_lines[i];
-      line(frame, Point(I[0], I[1]), Point(I[2], I[3]) , Scalar(255,0,0) , 2 , 8);
-    }
 
 
     //ROS_INFO("cols : %d , rows : %d" , frame.cols, frame.rows);
